@@ -1,30 +1,28 @@
-% Скрипт вычисляет матрицы A, N_k, B уравнения (23). Все формулы, на
-% которые есть ссылки в этом коде, можно посмотреть в работе "Построение и
-% анализ квадратичной аппроксимации нелинейной модели двухрайонной тестовой
-% электроэнергетической системы в пространстве состояний".
+% This script calculate the matrices A, N_k, B from equation (23). All
+% formulas referenced in this code can be found in the doc.pdf
 
 
-% ШАГ 1: ВЫЧИСЛЕНИЕ МАТРИЦ ИЗ УРАВНЕНИЯ (20) И МАТРИЦЫ Y ПРОВОДИМОСТИ
+% STEP#1: CALCULATION OF MATRICES FROM EQUATION (20) & ADDMITANCE MATRIX (Y)
 clear all
-sys_mat.init = fun_diagmat; % Матрицы Ad,Bd,Cd,Dd,Ad_2,Bd_2,Cd_2,Sd,Hd,B1,Y
-[sys_mat.init.E,sys_mat.init.M,sys_mat.init.P] = fun_emp; % Матрицы E, M, P
+sys_mat.init = fun_diagmat; % Matrices Ad,Bd,Cd,Dd,Ad_2,Bd_2,Cd_2,Sd,Hd,B1,Y
+[sys_mat.init.E,sys_mat.init.M,sys_mat.init.P] = fun_emp; % Matrices E,M,P
 
-% ШАГ 2: ВЫЧИСЛЕНИЕ МАТРИЦ ИЗ УРАВНЕНИЯ (22)
+% STEP#2: CALCULATION OF MATRICES FROM EQUATION (22)
 sys_mat.init = fun_sssys (sys_mat.init);
 
-% ШАГ 3: ВЫЧИСЛЕНИЕ МАТРИЦЫ БИЛИНЕАРИЗОВАННОЙ СИСТЕМЫ (УРАВНЕНИЕ (23))
+% STEP#3: CALCULATION OF BILINEAR SYSTEM MATRICES (EQUATION (23))
 sys_mat.init = fun_bilinsys(sys_mat.init);
 
-% ШАГ 4: УСТРАНЕНИЕ ЛИНЕЙНОЙ ЗАВИСИМОСТИ
+% STEP#4: ELIMINATION OF LINEAR DEPENDENCE
 sys_mat.lindep_sys = fun_lindep (sys_mat.init);
 
-% ШАГ 5: УСТРАНЕНИЕ ИЗБЫТОЧНОСТИ В ВЕКТОРЕ ПЕРЕМЕННЫХ СОСТОЯНИЯ
+% STEP 5: ELIMINATING REDUNDANCY IN THE VECTOR OF STATE VARIABLES
 sys_mat.reduce_sys = fun_reduce(sys_mat);
 
-%% ОПЦИОНАЛЬНО: ПОСТРОЕНИЕ ГРАФИКОВ ПЕРЕХОДНЫХ ПРОЦЕССОВ
+%% OPTIONAL: TRANSIENTS PLOTS
 run ('trp_simu.m')
 
-%% ============================ ФУНКЦИИ ================================
+%% ============================ FUNCTIONS ================================
 
 function [E,M,P] = fun_emp()
     Ei = struct;
@@ -40,7 +38,7 @@ function [E,M,P] = fun_emp()
     end
     E = blkdiag(Ei.Ei1,Ei.Ei2,Ei.Ei3,Ei.Ei4);
 
-    % Матрица M
+    % Matrix M
     Mi = struct;
     I = eye(2,2);
     for i = 1:4
@@ -55,7 +53,7 @@ function [E,M,P] = fun_emp()
     M = [blkdiag(Mi.Mi1,Mi.Mi2,Mi.Mi3,Mi.Mi4) zeros(16,48);
         zeros(8,96) zeros(8,48)];
 
-    % Матрица P
+    % Matrix P
     Pi = struct;
     I = eye(6,6);
     for i = 1:4
@@ -85,29 +83,30 @@ function sys_mat = fun_sssys(sys_mat)
     M = sys_mat.M;
     P = sys_mat.P;
     B1 = sys_mat.B1;
-    % Формируем символьный вектор x и x^(2) (x_kr)
+    % Forming a symbolic vectors x and x^(2) (x_kr)
     x_G1 = sym('x_g1', [6 1]);
     x_G2 = sym('x_g2', [6 1]);
     x_G3 = sym('x_g3', [6 1]);
     x_G4 = sym('x_g4', [6 1]);
     x = [x_G1; x_G2; x_G3; x_G4];
     x_kr = kron(x,x);
-    % Единичная матрица
+    % Identity matrix
     I = eye(12);
-    % Выражение для V в символьном виде (см. формулу (21))
+    % Expression for V in symbolic form (see formula (21))
     V = inv(Y - Dd - Sd * P * kron(I,x)) * (Cd * x + Cd_2 * E * kron(x,x));
-    % Выражения для 2-го, 4-го и 5-го слагаемого формулы (20) в символьном виде
+    % Expressions for the 2nd, 4th and 5th terms of formula (20) in symbolic form
     term_2 = Bd * V;
     term_4 = Bd_2 * M * kron(V,V);
     term_5 = Hd * P * kron(V,x);
-    % Раскладываем term_2,term_4,term_5 в ряд Тейлора до 2го порядка в точке x0 = 0
+    % Decompose term_2, term_4, term_5 into a Taylor series up to the 2nd 
+    % order at the point x0 = 0
     TaylorSeries.term2.taylor = taylor(term_2,x,'Order',3);
     TaylorSeries.term4.taylor = taylor(term_4,x,'Order',3);
     TaylorSeries.term5.taylor = taylor(term_5,x,'Order',3);
 
-    % Вычисление матриц из уравнения (22)
+    % Calculation of matrices from equation (22)
 
-    % Матрицы B_D*B_lin и B_D*B_sqr
+    % Matrices B_D*B_lin & B_D*B_sqr
     sx = string(x);
     sx_kr = string(x_kr);
     tmp_tayseries = TaylorSeries.term2.taylor;
@@ -121,7 +120,7 @@ function sys_mat = fun_sssys(sys_mat)
             Bd_Bsqr (i,:) = get_sqr(c,st,sx_kr);
         end 
     end
-    % Матрицы B_D2*M*B_2lin и B_D2*M*B_2sqr
+    % Matrices B_D2*M*B_2lin & B_D2*M*B_2sqr
     tmp_tayseries = TaylorSeries.term4.taylor;
     Bd2M_B2lin = zeros(size(tmp_tayseries,1),size(x,1));
     Bd2M_B2sqr = zeros(size(tmp_tayseries,1),size(x_kr,1));
@@ -133,7 +132,7 @@ function sys_mat = fun_sssys(sys_mat)
             Bd2M_B2sqr (i,:) = get_sqr(c,st,sx_kr);
         end 
     end
-    % Матрицы H_D*P*H_lin и H_D*P*H_sqr
+    % Matrices H_D*P*H_lin & H_D*P*H_sqr
     tmp_tayseries = TaylorSeries.term5.taylor;
     HdP_Hlin = zeros(size(tmp_tayseries,1),size(x,1));
     HdP_Hsqr = zeros(size(tmp_tayseries,1),size(x_kr,1));
@@ -145,17 +144,17 @@ function sys_mat = fun_sssys(sys_mat)
             HdP_Hsqr (i,:) = get_sqr(c,st,sx_kr);
         end 
     end
-    % Матрицы А1, А2
+    % Matrices А1, А2
     sys_mat.A1 = Ad + Bd_Blin + Bd2M_B2lin + HdP_Hlin;
     sys_mat.A2 = Ad_2 * E + Bd_Bsqr + Bd2M_B2sqr + HdP_Hsqr;
-    % Перечень состояний
+    % List of states
     sys_mat.x = string(x);
     sys_mat.x_kr = string(x_kr);
     sys_mat.x_full = [sys_mat.x;sys_mat.x_kr];
 end
 
 function c_lin = get_lin(c,t,x)
-    % Достаём линейные коэффициенты
+    % get linear coefficients
     c_lin = zeros (1,size(x,1));
     for i_x = 1 : size(x,1)
         id = find(strcmp(x(i_x),t));
@@ -166,12 +165,12 @@ function c_lin = get_lin(c,t,x)
 end
 
 function c_sqr = get_sqr (c,t,x_kr)
-    % Достаём квадратичные коэффициенты
+    % get quadratic coefficients
     exception_x_kr = string;
     c_sqr = zeros (1,size(x_kr,1));
     for i_x = 1 : size(x_kr,1)
-        if sum(x_kr(i_x) == exception_x_kr) == 1 % если элемент из x_kr уже был
-            continue %  то переходим к следующему шагу
+        if sum(x_kr(i_x) == exception_x_kr) == 1 % if the element from x_kr has already been
+            continue %  then we move on to the next step
         end
         tmp_x = x_kr(i_x);
         tf = strcmp(tmp_x,t);
@@ -187,7 +186,7 @@ function sys_mat = fun_bilinsys(sys_mat)
     A1 = sys_mat.A1;
     A2 = sys_mat.A2;
     B1 = sys_mat.B1;
-    % Матрица А билинеаризованной системы
+    % Matrix A of a bilinearized system
     n = size(A1,1);
     n2 = n + n * n;
     I = eye(n, n);
@@ -198,11 +197,11 @@ function sys_mat = fun_bilinsys(sys_mat)
     A(n+1:n2, n+1:n2) = A21;
     sys_mat.A21 = A21;
     sys_mat.A = A;
-    % Матрица B (управления) билинеаризованной системы
+    % Matrix B (controls) bilinearized system
     B = zeros(size(A,1), 8);
     B(1:n,:) = B1;
     sys_mat.B = B;
-    % Матрица N билинеаризованной системы
+    % Matrix N of a bilinearized system
     for i = 1: size(B1,2)
         eval(['B20',num2str(i), ' = kron(B1(:,i), I) + kron(I, B1(:,i));'])
         eval(['sys_mat.N.N',num2str(i), ' = zeros(size(A));'])
@@ -211,11 +210,11 @@ function sys_mat = fun_bilinsys(sys_mat)
 end
 
 function lindep_sys = fun_lindep (sys_mat)
-    A1 = sys_mat.A1; % линейная часть матрицы билинейной системы
-    A2 = sys_mat.A2; % квадратичная часть матрицы билинейной системы
+    A1 = sys_mat.A1; % linear part of the bilinear system matrix
+    A2 = sys_mat.A2; % quadratic part of the bilinear system matrix 
     B1 = sys_mat.B1;
     N = sys_mat.N;
-    % вычитаем строки:
+    % subtract the lines:
     A1([7,8],:) = A1([7,8],:) - A1([1,2],:); 
     A1([13,14],:) = A1([13,14],:) - A1([1,2],:);
     A1([19,20],:) = A1([19,20],:) - A1([1,2],:);
@@ -224,7 +223,7 @@ function lindep_sys = fun_lindep (sys_mat)
     A2([13,14],:) = A2([13,14],:) - A2([1,2],:);
     A2([19,20],:) = A2([19,20],:) - A2([1,2],:);
     A2([1,2],:) = A2([1,2],:) - A2([1,2],:);
-    % перестраиваем матрицу A21 и матрицу А билинеаризованной системы
+    % reconstructing matrix A21 and matrix A of the bilinearized system
     n = size(A1,1);
     n2 = n + n * n;
     I = eye(n, n);
@@ -233,19 +232,19 @@ function lindep_sys = fun_lindep (sys_mat)
     A_lnd(1:n, 1:n) = A1;
     A_lnd(1:n, n+1:n2) = A2;
     A_lnd(n+1:n2, n+1:n2) = A21;
-    % матрицы линейной и квадратичной аппроксимации
+    % linear and quadratic approximation matrices
     lindep_sys.A1 = A1;
     lindep_sys.A = A_lnd;
-    % матрицы B и N:
-    % вычитаем строки:
+    % matrices B & N:
+    % subtract the lines:
     B1([7,8],:) = B1([7,8],:) - B1([1,2],:); 
     B1([13,14],:) = B1([13,14],:) - B1([1,2],:);
     B1([19,20],:) = B1([19,20],:) - B1([1,2],:);
     B1([1,2],:) = B1([1,2],:) - B1([1,2],:);
-    % матрица B (управления) билинеаризованной системы
+    % Matrix B (controls) bilinearized system
     B = zeros(size(A_lnd,1), 8);
     B(1:n,:) = B1;
-    % Матрица N билинеаризованной системы
+    % Matrix N bilinearized system
     for i = 1: size(B1,2)
         eval(['B20',num2str(i), ' = kron(B1(:,i), I) + kron(I, B1(:,i));'])
         eval(['N.N',num2str(i), ' = zeros(size(A_lnd));'])
@@ -268,11 +267,11 @@ function reduce_sys = fun_reduce(sys_mat)
         ID{p,1} = tmp;
         if tmp(1) == p
             s = s + 1;
-            id(s,1) = p; % список номеров переменных без повторений
+            id(s,1) = p; % list of variable numbers without repetition
         else
             r = r + 1;
-            rmv(r,1) = p; % список номеров повторяющихся переменных, подлежащих удалению
-            svd(r,1) = tmp(1); % список номеров повторяющихся переменных, подлежащих сохранению
+            rmv(r,1) = p; % list of duplicate variable numbers to be deleted
+            svd(r,1) = tmp(1); % list of duplicate variable numbers to be saved
         end
     end
     Ared = A;
