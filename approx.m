@@ -2,7 +2,7 @@
 % formulas referenced in this code can be found in the doc.pdf
 
 
-% STEP#1: CALCULATION OF MATRICES FROM EQUATION (20) & ADDMITANCE MATRIX (Y)
+% STEP#1: CALCULATION OF MATRICES FROM EQUATION (20) & ADMITTANCE MATRIX (Y)
 clear all
 sys_mat.init = fun_diagmat; % Matrices Ad,Bd,Cd,Dd,Ad_2,Bd_2,Cd_2,Sd,Hd,B1,Y
 [sys_mat.init.E,sys_mat.init.M,sys_mat.init.P] = fun_emp; % Matrices E,M,P
