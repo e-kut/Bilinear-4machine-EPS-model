@@ -1,47 +1,49 @@
-function [sys_mat] = fun_diagmat()
-% Ссылки на формулы и страницы даны по книге Kundur P. "Power Systems 
+%                               !!!
+% Links to formulas and pages are given from the Kundur P. "Power Systems 
 % Stability and Control". – New York: McGraw-Hill, Inc., 1994.
+%                               !!!
 
-% 1. Загружаем исходные данные
+function [sys_mat] = fun_diagmat()
+% 1. Uploading the source data
 clear all
 init_data = id4mac();
 
-% 2. Вычисляем матрицу проводимостей для сети из 6-ти узлов
+% 2. Calculate the admittance matrix for a network of 6 nodes
 admit_mat = fadmit_mat(init_data.line);
 
-% 3. Вычисляем установившиеся значения напряжений, мощностей и токов в узлах
+% 3. Calculate the steady-state values of voltages, powers and currents in the nodes
 power_flow = fpower_flow(init_data.power_flow,admit_mat.Y_cmplx_l);
 
-% 4. Вычисляем матрицы коэффициентов Тейлора
+% 4. Calculation of the Taylor coefficient matrix
 
-% 4.1. Матрицы генераторов A_G(i), A_G(i)_2, B_G(i), B_G(i)_2,
+% 4.1. Generator matrces A_G(i), A_G(i)_2, B_G(i), B_G(i)_2,
 %                          C_G(i), C_G(i)_2, D_G(i), H_G(i), S_G(i)
 bilin_gen = fbilin_gen (init_data.machine,power_flow);
 
-% 4.2. Матрицы нагрузок D_L(i)
-% m - коэффициент активной составляющей нагрузки (см. 12.199, с.797 Кундур)
-% n - коэффициент реактивной составляющей нагрузки(см. 12.199, с.797 Кундур)
+% 4.2. Load matrices D_L(i)
+% m - the coefficient of the active component of the load (see eq.12.199, p.797)
+% n - the coefficient of the reactive component of the load(see eq.12.199, p.797)
 
-% см. с. 797-798 Кундур:
+% see p.797-798:
 % m = 0(n = 0) -    constant MVA characteristic for active (reactive)
 %                   component of load
 % m = 1(n = 1) -    constant current characteristic for active (reactive)
 %                   component of load
 % m = 2(n = 2) -    constant impedance characteristic for active (reactive)
 %                   component of load
-m = 1; n = 2; % с.814(a) Кундур
+m = 1; n = 2; % p.814(a)
 lin_load = flin_load (init_data.machine.n_gen,init_data.power_flow.n_load,...
     power_flow,n,m);
 clear m n
 
-% 5. Компоновка диагональных матриц системы (Ad, Bd, Cd, Dd) и матрицы B1
-% входов
+% 5. Construction of diagonal matrices of the system (Ad, Bd, Cd, Dd) and 
+% input matrix B1
 sys_mat = fsys_mat(init_data.machine.n_gen, init_data.power_flow.n_load,...
     bilin_gen,lin_load);
 
 sys_mat.Y = admit_mat.Y_m;
 end
-%%                             ФУНКЦИИ
+%%                             FUNCTIONS
 %=========================ADMITTANCE MATRIX================================
 function [admit_mat] = fadmit_mat(data_line)
 
@@ -50,16 +52,13 @@ x_L = data_line.x_L;
 b_C = data_line.b_C;
 r_transf_m = data_line.r_transf_m;
 
-% Полное удельное сопротивление линии [p.u. / km] в системе линий 100MVA/230 kV
+% The total resistivity of the line [p.u./km] on 100MVA, 230kV base
 R_line = r + x_L * 1i;
 
-% Перевод сопротивления трансформатора из системы машин 900MVA/230kV в
-% систему линий 100MVA/230kV:
-
+% Transformer resistance on 100MVA, 230kV base (per unit system of lines):
 r_transf_line = r_transf_m * 100 / 900;
 
-% Вычисление проводимостей элементов 11-ти узловой сети:
-
+% Calculation of conductivities of elements of an 11-node network:
 Y_11bus.Y11 = 1 / r_transf_line;
 Y_11bus.Y15 = - Y_11bus.Y11;
 Y_11bus.Y22 = Y_11bus.Y11;
@@ -96,8 +95,7 @@ Y_11bus.Y11_3 = Y_11bus.Y3_11;
 Y_11bus.Y11_10 = Y_11bus.Y10_11;
 Y_11bus.Y11_11 = Y_11bus.Y55;
 
-% Вычисление проводимостей элементов 6-ти узловой сети:
-
+% Calculation of conductivities of elements of a 6-node network:
 tmp_12 = Y_11bus.Y55 * Y_11bus.Y66 - Y_11bus.Y56...
     * Y_11bus.Y65;
 tmp_34 = Y_11bus.Y10_10 * Y_11bus.Y11_11 ...
@@ -139,8 +137,8 @@ Y_6bus.Y66 = Y_11bus.Y99 - (Y_11bus.Y89...
     * Y_11bus.Y98 / Y_11bus.Y88) - (Y_11bus.Y10_9...
     * Y_11bus.Y9_10 * Y_11bus.Y11_11 / tmp_34);
 
-% Матрица проводимости для сети из 6-ти узлов в комплексном виде в системе
-% относительных единиц линий:
+% The admittance matrix for a network of 6 nodes in a complex form (in a 
+% per units system of lines):
 Y_cmplx_l = [Y_6bus.Y11 Y_6bus.Y12 0 0 Y_6bus.Y15 0;
         Y_6bus.Y21 Y_6bus.Y22 0 0 Y_6bus.Y25 0;
         0 0 Y_6bus.Y33 Y_6bus.Y34 0 Y_6bus.Y36;
@@ -150,17 +148,17 @@ Y_cmplx_l = [Y_6bus.Y11 Y_6bus.Y12 0 0 Y_6bus.Y15 0;
         0 0 Y_6bus.Y63 Y_6bus.Y64 Y_6bus.Y65...
         Y_6bus.Y66];
     
-% Матрица Y_cmplx_l с действительными компонентами (в системе линий):
-for i=1:6                
- for j=1:6
-   Y_l(2*i-1, 2*j-1) = real(Y_cmplx_l(i,j));
-   Y_l(2*i-1, 2*j) = -imag(Y_cmplx_l(i,j));
-   Y_l(2*i, 2*j-1) = imag(Y_cmplx_l(i,j));
-   Y_l(2*i, 2*j) = real(Y_cmplx_l(i,j));
- end
+% Matrix Y_cmplx_l with real components (in a per units system of lines):
+for i=1:6
+    for j=1:6
+        Y_l(2*i-1, 2*j-1) = real(Y_cmplx_l(i,j));
+        Y_l(2*i-1, 2*j) = -imag(Y_cmplx_l(i,j));
+        Y_l(2*i, 2*j-1) = imag(Y_cmplx_l(i,j));
+        Y_l(2*i, 2*j) = real(Y_cmplx_l(i,j));
+    end
 end
 
-% Матрица проводимости с действительными компонентами в системе машин:
+% An admittance matrix with real components in a machine system:
 Y_m = Y_l * 1/9;
 
 admit_mat.Y_cmplx_l = Y_cmplx_l;
@@ -172,105 +170,108 @@ end
 
 %========================POWER FLOW ANALYSIS===============================
 function [power_flow] = fpower_flow(mac_dat, Y)
-% Количество шагов итерационной процедуры:
+% Number of steps of the iterative procedure:
 val_step = 1000000;
 
-% Номер slack bus:
-N_sb = 3; % код не допускает изменения номера шины
+% Number of slack bus:
+N_sb = 3; % the code does not allow changing the slack bus number
 
-% Стартовые данные итерационной процедуры:
-P = [mac_dat.P;-mac_dat.P_load] / 100; % Активная мощность в узлах 1 - 6
-                                      % в относительных единицах системы 
-                                      % линий 100MVA/230kV
-P(N_sb) = 0; % начальная активная мощность на slack bus
-Q = zeros(6,val_step); % Реактивная мощность в узлах 1-6
-Q(5,:) = mac_dat.Q_load(1) / 100; % заданная реактивная мощность нагрузки
-                                  % в узле № 7 в системе линий 100MVA/230kV
-Q(6,:) = mac_dat.Q_load(2) / 100; % заданная реактивная мощность нагрузки
-                                  % в узле № 9 в системе линий 100MVA/230kV
+% Initial data of the iterative procedure:
+P = [mac_dat.P;-mac_dat.P_load] / 100; % Active power in nodes # 1-6 in the
+                                       % per unit system of lines 100MVA, 230kV
+P(N_sb) = 0; % initial active power on slack bus
+Q = zeros(6,val_step); % Reactive power in nodes # 1-6
+Q(5,:) = mac_dat.Q_load(1) / 100; % the specified reactive power of the 
+                                  % load in node #7 in the per unit system
+                                  % of lines 100MVA, 230kV
+Q(6,:) = mac_dat.Q_load(2) / 100; % the specified reactive power of the 
+                                  % load in node #9 in the per unit system
+                                  % of lines 100MVA, 230kV
 V_rect_l = zeros(6,val_step);
-V_rect_l (1:4,1) = mac_dat.absE; % заданные амплитуды напряжений в 
-                                 % генераторных узлах 1-4 в относительных
-                                 % единицах системы линий 100MVA/230kV
+V_rect_l (1:4,1) = mac_dat.absE; % the specified voltage amplitudes in 
+                                 % generator nodes 1-4 in the per units system 
+                                 % of lines 100MVA, 230kV
 V_rect_l(N_sb,:) = mac_dat.absE(N_sb) * exp(mac_dat.angE(N_sb)...
-    * 1i * pi / 180); % комплексное напряжение на slack bus в относительных
-                      % единицах системы линий 100MVA/230kV
-V_rect_l (5:6,1) = 1; % начальные значения напряжений в нагрузочных узлах 
-                      % № 7,9 в pu системы линий 100MVA/230kV
+    * 1i * pi / 180); % complex voltage on slack bus in the per units system 
+                                 % of lines 100MVA, 230kV
+V_rect_l (5:6,1) = 1; % initial values of voltages in the load nodes # 7,9
+                      % in the per units system of lines 100MVA, 230kV
 
-% Итерационная процедура:
+% Iterative procedure:
 for iter = 1:val_step-1
-    % Напряжение в узле № 9:
+    % Voltage in node #9:
     V_rect_l(6,iter + 1) = - 1 / Y(6,6) ...
     * (V_rect_l(3,iter) * Y(6,3) + V_rect_l(4,iter) * Y(6,4) ...
     + V_rect_l(5,iter) * Y(6,5) - (P(6) - Q(6,iter) * 1i) ...
     / conj(V_rect_l(6,iter)));
 
-    % Напряжение в узле № 7:
+    % Voltage in node #7:
     V_rect_l(5,iter + 1) = - 1 / Y(5,5) ...
     * (V_rect_l(1,iter) * Y(5,1) + V_rect_l(2,iter) * Y(5,2) ...
     + V_rect_l(6,iter+1) * Y(5,6) - (P(5) - Q(5,iter) * 1i) ...
     / conj(V_rect_l(5,iter)));
 
-    % Узел № 4:
-    % Реактивная мощность:
+    % Node #4:
+    % Reactive power:
     Q(4,iter+1) = - imag(conj(V_rect_l(4,iter)) * (V_rect_l(3,iter) * Y(4,3) ...
         + V_rect_l(4,iter) * Y(4,4) + V_rect_l(6,iter+1) * Y(4,6)));
     
-    % Напряжение:
+    % Voltage:
     V_rect_l(4,iter + 1) = - 1 / Y(4,4) ...
     * (V_rect_l(3,iter) * Y(4,3) + V_rect_l(6,iter+1) * Y(4,6) ...
     - (P(4) - Q(4,iter+1) * 1i) / conj(V_rect_l(4,iter)));
 
-    % Действительная часть напряжения:
+    % Real part of voltage:
     Re_V4 = sqrt (V_rect_l(4,1)^2 - imag(V_rect_l(4,iter + 1))^2);
-    % Напряжение с модулем V_rect_l(4,1):
+    % Voltage with absolute value V_rect_l(4,1):
     V_rect_l(4,iter + 1) = Re_V4 + imag(V_rect_l(4,iter + 1)) * 1i;
     
-    % Узел № 2:
-    % Реактивная мощность:
+    % Node #2:
+    % Reactive power:
     Q(2,iter+1) = - imag(conj(V_rect_l(2,iter)) * (V_rect_l(1,iter) * Y(2,1) ...
         + V_rect_l(2,iter) * Y(2,2) + V_rect_l(5,iter+1) * Y(2,5)));
     
-    % Напряжение:
+    % Voltage:
     V_rect_l(2,iter + 1) = - 1 / Y(2,2) ...
     * (V_rect_l(1,iter) * Y(2,1) + V_rect_l(5,iter+1) * Y(2,5) ...
     - (P(2) - Q(2,iter+1) * 1i) / conj(V_rect_l(2,iter)));
 
-    % Действительная часть напряжения:
+    % Real part of voltage:
     Re_V2 = sqrt (V_rect_l(2,1)^2 - imag(V_rect_l(2,iter + 1))^2);
-    % Напряжение с модулем V_rect_l(2,1):
+    % Voltage with absolute value V_rect_l(2,1):
     V_rect_l(2,iter + 1) = Re_V2 + imag(V_rect_l(2,iter + 1)) * 1i;
     
-    % Узел № 1:
-    % Реактивная мощность:
+    % Node #1:
+    % Reactive power:
     Q(1,iter+1) = - imag(conj(V_rect_l(1,iter)) * (V_rect_l(1,iter) * Y(1,1) ...
         + V_rect_l(2,iter+1) * Y(1,2) + V_rect_l(5,iter+1) * Y(1,5)));
     
-    % Напряжение:
+    % Voltage:
     V_rect_l(1,iter + 1) = - 1 / Y(1,1) ...
     * (V_rect_l(2,iter+1) * Y(1,2) + V_rect_l(5,iter+1) * Y(1,5) ...
     - (P(1) - Q(1,iter+1) * 1i) / conj(V_rect_l(1,iter)));
 
-    % Действительная часть напряжения:
+    % Real part of voltage:
     Re_V1 = sqrt (V_rect_l(1,1)^2 - imag(V_rect_l(1,iter + 1))^2);
-    % Напряжение с модулем V_rect_l(1,1):
+    % Voltage with absolute value V_rect_l(1,1):
     V_rect_l(1,iter + 1) = Re_V1 + imag(V_rect_l(1,iter + 1)) * 1i;
 end
 
-% Мощности в узле № 3 (slack bus):
+% Powers in node #3 (slack bus):
 P(3) = real(conj(V_rect_l(3,end)) * (Y (3,:) * V_rect_l(:,end)));
 Q(3,end) = -imag(conj(V_rect_l(3,end)) * (Y (3,:) * V_rect_l(:,end)));
 
-% Установившиеся значения мощностей, напряжений и токов (в системе линий 100MVA/230kV):
+% Steady-state values of powers, voltages and currents (in p.u. system of 
+% lines 100MVA, 230kV):
 P0_l = P;
 Q0_l = Q(:,end);
 V0_l = V_rect_l(:,end);
 I0_l = (P0_l - Q0_l * 1i) ./ conj(V0_l);
 
-% Проверка правильности расчёта power flow:
-delta = I0_l - Y * V0_l(:,end); % Разница между левой и правой частью уравнений сети
-angEt = rad2deg(angle(V0_l)); % Фазы напряжений на генераторных шинах
+% Checking the correctness of the power flow calculation:
+delta = I0_l - Y * V0_l(:,end); % The difference between the left and right
+                                % side of the network equations
+angEt = rad2deg(angle(V0_l)); % Voltage phases on generator buses
 
 power_flow.P0_l = P0_l;
 power_flow.Q0_l = Q0_l;
@@ -292,7 +293,7 @@ for ngen = 1:n_gen
 
     name_field = string(['G' num2str(ngen)]);
 
-    % Исходные нерасчётные данные в системе машин 900MVA/20kV
+    % Initial non-calculated data (in p.u. system of machines 900MVA, 20kV)
     omega_0 = mac_dat.omega_0(ngen);
     X_d = mac_dat.X_d (ngen);
     X_d_ht = mac_dat.X_d_ht(ngen);
@@ -312,39 +313,41 @@ for ngen = 1:n_gen
     H = mac_dat.H(ngen);
     K_D = mac_dat.K_D(ngen);
 
-    % Установившиеся значения мощностей и напряжений в системе линий:
-    P = power_flow.P0_l(ngen); % активная мощность
-    Q = power_flow.Q0_l(ngen); % реактивная мощность
-    E_t_tild = power_flow.V0_l(ngen); % комплексное напряжение
-    E_t = abs(E_t_tild); % амплитуда терминального напряжения в системе машин
+    % Steady-state values of powers, voltages and currents (in p.u. system
+    % of lines, 100MVA, 230kV):
+    P = power_flow.P0_l(ngen); % active power
+    Q = power_flow.Q0_l(ngen); % reactive power
+    E_t_tild = power_flow.V0_l(ngen); % complex voltage
+    E_t = abs(E_t_tild); % the amplitude of the terminal voltage (in p.u. 
+                         % system of machines 900MVA, 20kV)
 
-    % Определяем индуктивности (предполагается, что в системе относительных
-    % едениц индуктивность равна реактивному сопротивлению,X_index = L_index):
+    % Calculation of inductance (it is assumed that in the p.u. system, 
+    % inductance is equal to reactance, i.e. X_index = L_index):
     L_d = X_d;  L_d_ht = X_d_ht;    L_d_2ht = X_d_2ht;
     L_q = X_q;  L_q_ht = X_q_ht;    L_q_2ht = X_q_2ht;
     L_l = X_l;
 
-    % unsaturated mutual inductances (Example 4.1, p.154):
+    % Unsaturated mutual inductances (Example 4.1, p.154):
     L_ad = L_d - L_l;
     L_aq = L_q - L_l;
 
-    % field winding inductance (Example 4.1, p.154):
+    % Field winding inductance (Example 4.1, p.154):
     L_fd = L_ad*(L_d_ht - L_l)/(L_ad - L_d_ht + L_l);
 
-    % damping windings inductance (Example 4.1, p.154):
+    % Damping windings inductance (Example 4.1, p.154):
     L_1q = L_aq*(L_q_ht - L_l)/(L_aq - L_q_ht + L_l);
     L_1d = -L_ad * L_fd * (L_l - L_d_2ht) / (L_ad * L_fd + L_ad * L_l - ...
         L_ad * L_d_2ht + L_fd * L_l - L_fd * L_d_2ht);
     L_2q = -L_aq * L_1q * (L_l - L_q_2ht)/(L_1q * L_aq + L_1q * L_l -...
         L_1q * L_q_2ht + L_aq * L_l - L_aq * L_q_2ht);
 
-    % rotor windings inductance (Example 4.1, p.154):
+    % Rotor windings inductance (Example 4.1, p.154):
     R_fd = (L_ad + L_fd) / (T_d0_ht * omega_0);
     R_1d = (L_1d + (L_ad * L_fd) / (L_ad + L_fd)) / (T_d0_2ht * omega_0);
     R_1q = (L_aq + L_1q) / (T_q0_ht * omega_0);
     R_2q = (L_2q + (L_aq * L_1q) / (L_aq + L_1q)) / (T_q0_2ht * omega_0);
 
-    % total saturation factors K_sd, K_sq (Section 3.8, p.114):
+    % Total saturation factors K_sd, K_sq (Section 3.8, p.114):
     I_t_tild = conj(P + Q * 1i) / conj(E_t_tild); %p.733
     I_t_tild = I_t_tild* 1/9;
     
@@ -358,7 +361,7 @@ for ngen = 1:n_gen
     K_sd = psi_at / (psi_at + psi_I); %eq.3.187, p.116
     K_sq = K_sd;
 
-    % Параметры рабочей точки с. 746:
+    % Operating point parameters (see p. 746):
     % saturated values of synchronous reactances & inductances:
     X_ds = K_sd * L_ad + L_l;
     X_qs = K_sq * L_aq + L_l;
@@ -395,12 +398,12 @@ for ngen = 1:n_gen
     psi_ad0 = K_sd * L_ad * (-i_d0 + i_fd0);
     psi_aq0 = - K_sq * L_aq * i_q0;
     psi_fd0 = i_fd0 * L_fd;
-    %psi_fd0 = (K_sd * L_ad + L_fd) * i_fd0 - K_sd * L_ad * i_d0;% с.104
-    %psi_1d0 = K_sd * L_ad * (i_fd0 - i_d0);% с.104
-    %psi_1q0 = -K_sq * L_aq * i_q0;% с.104
-    %psi_2q0 = -K_sq * L_aq * i_q0;% с.104
+    %psi_fd0 = (K_sd * L_ad + L_fd) * i_fd0 - K_sd * L_ad * i_d0;% p.104
+    %psi_1d0 = K_sd * L_ad * (i_fd0 - i_d0);% p.104
+    %psi_1q0 = -K_sq * L_aq * i_q0;% p.104
+    %psi_2q0 = -K_sq * L_aq * i_q0;% p.104
 
-    % Дополнительное насыщение (с.745)
+    % incremental saturation (p.745)
     psi_at0 = psi_at;
     % incremental saturation factor:
     K_sd_incr = 1 / (1 + B_Sat * A_Sat * exp(B_Sat * (psi_at0 - psi_TI)));
@@ -410,20 +413,21 @@ for ngen = 1:n_gen
     L_ads = K_sd_incr * L_ad;
     L_aqs = K_sq_incr * L_aq;
 
-    % Коэффициенты a_ij
+    % Coefficients a_ij
 
-    % Пересчитываем индуктивности с учётом доп. насыщения:
+    % Recalculate the inductance taking into account the incremental saturation:
     L_ads_2ht = 1 / (1 / L_ads + 1 / L_fd + 1 / L_1d);
     L_aqs_2ht = 1 / (1 / L_aqs + 1 / L_1q + 1 / L_2q);
     
-    % Вычисляем параметры рабочей точки с учётом L_ads_2ht и L_aqs_2ht:
+    % Calculation of the parameters of the operating point taking into 
+    % account L_ads_2ht и L_aqs_2ht:
     psi_1d0 = (psi_ad0 / L_ads_2ht + i_d0 - psi_fd0/L_fd) * L_1d;
     psi_1q0 = (psi_aq0 / L_aqs_2ht + i_q0) * L_1q * L_2q / (L_1q + L_2q);
     psi_2q0 = psi_1q0;
     
     delta_0r = deg2rad(delta_0);
 
-% Линейные коэффициенты:
+    % Linear coefficients:
     a_11 = - K_D / (2 * H);
 
     a_12 = ((L_ads_2ht - L_aqs_2ht)*L_1d*L_2q*(((E_im0^2 - E_re0^2)* ...
@@ -754,15 +758,8 @@ for ngen = 1:n_gen
         cos(delta_0r) - sin(delta_0r)^2*R_a)/((L_aqs_2ht + L_l)*L_ads_2ht...
         + L_l^2 + L_l*L_aqs_2ht + R_a^2);
 
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-% Квадратичные коэффициенты:
+    % Quadratic coefficients:
 a_18 = 1/(4*H*L_1q*L_1d*L_2q*((L_aqs_2ht + L_l)*L_ads_2ht + L_aqs_2ht*L_l...
     + L_l^2 + R_a^2)^2*L_fd)*(2*L_1q*L_1d*L_2q*((-2*E_im0*E_re0*L_aqs_2ht -...
     2*E_im0*E_re0*L_l + R_a*(E_im0^2 - E_re0^2))*L_ads_2ht + (-2*E_im0*E_re0...
@@ -916,8 +913,6 @@ a_6_8 = -(((L_ads_2ht*E_im0 + L_l*E_im0 + R_a*E_re0)*cos(delta_0r) -...
     L_aqs_2ht + R_a^2));
 
 
-
-
 b_11_2 = -((-L_aqs_2ht + L_ads_2ht)*(-R_a*cos(delta_0r) + sin(delta_0r)*...
     (L_ads_2ht + L_l))*((L_aqs_2ht + L_l)*cos(delta_0r) + R_a*sin(delta_0r)))...
     /(2*H*(L_l^2 + (L_ads_2ht + L_aqs_2ht)*L_l + L_ads_2ht*L_aqs_2ht + R_a^2)^2);
@@ -933,8 +928,6 @@ b_14_2 = ((-L_aqs_2ht + L_ads_2ht)*(-R_a*cos(delta_0r) + sin(delta_0r)*...
     /(2*H*(L_l^2 + (L_ads_2ht + L_aqs_2ht)*L_l + L_ads_2ht*L_aqs_2ht + R_a^2)^2);
 
 b_13_2 = b_12_2;
-
-
 
 
 h_12 = 1 / (2*H*L_1q*L_1d*L_2q*((L_aqs_2ht + L_l)*L_ads_2ht + L_aqs_2ht*...
@@ -1080,7 +1073,6 @@ h_62 = -((L_ads_2ht + L_l)*cos(delta_0r) + R_a*sin(delta_0r))*omega_0*R_2q...
 h_68 = -omega_0*(-R_a*cos(delta_0r) + sin(delta_0r)*(L_ads_2ht + L_l))*R_2q...
     *L_aqs_2ht/(L_2q*(L_l^2 + (L_ads_2ht + L_aqs_2ht)*L_l + L_ads_2ht*L_aqs_2ht...
     + R_a^2));
-    
 
 
 c_18 = (2*L_1d*L_1q*L_2q*L_fd*E_im0*(L_ads_2ht - L_aqs_2ht)*cos(delta_0r)^2 ...
@@ -1123,7 +1115,6 @@ c_2_12 = ((L_ads_2ht + L_l)*cos(delta_0r) - R_a*sin(delta_0r))*L_aqs_2ht/...
     ((L_l^2 + (L_ads_2ht + L_aqs_2ht)*L_l + R_a^2 + L_ads_2ht*L_aqs_2ht)*L_2q);
 
 
-
 s_12 = (cos(delta_0r) - sin(delta_0r))*(cos(delta_0r) + sin(delta_0r))*...
     (L_ads_2ht - L_aqs_2ht)/((L_aqs_2ht + L_l)*L_ads_2ht + L_l^2 + L_l*...
     L_aqs_2ht + R_a^2);
@@ -1136,8 +1127,7 @@ s_28 = -(cos(delta_0r) - sin(delta_0r))*(cos(delta_0r) + sin(delta_0r))*...
     L_aqs_2ht + R_a^2);
 
 
-    % Матрицы линейной части:
-
+    % Matrices of the linear part:
     A = [   a_11 a_12 a_13 a_14 a_15 a_16;
             a_21 a_22 a_23 a_24 a_25 a_26;
             a_31 a_32 a_33 a_34 a_35 a_36;
@@ -1155,7 +1145,7 @@ s_28 = -(cos(delta_0r) - sin(delta_0r))*(cos(delta_0r) + sin(delta_0r))*...
     D = [   d_11 d_12;
             d_21 d_22];
 
-    % Матрицы квадратичной части:
+    % Matrices of the quadratic part:
     A_2 = zeros(6,36);
     A_2(1,8:12) = [a_18 a_19 a_1_10 a_1_11 a_1_12];
     A_2(1,14:18) = [0 a_1_15 a_1_16 a_1_17 a_1_18];
@@ -1181,12 +1171,12 @@ s_28 = -(cos(delta_0r) - sin(delta_0r))*(cos(delta_0r) + sin(delta_0r))*...
     S(:,2) = [ s_12; s_22];
     S(:,8) = [ s_18; s_28];
         
-    % Ненулевые коэффициенты матрицы управления
+    % Non-zero coefficients of the control matrix
     b11 = 1 / (2 * H);
     b32 = omega_0 * R_fd / L_ad;
     
     
-    % Формирует структуру результатов линеаризации генератора № ngen:
+    % Forms the structure of the bilinearization results of the generator # ngen:
     
     bilin_gen = setfield(bilin_gen,name_field,'E_re0',E_re0);
     bilin_gen = setfield(bilin_gen,name_field,'E_im0',E_im0);
@@ -1219,7 +1209,7 @@ end
 
 
 end
-%=====================END of LINEARIZE of GENERATOR========================
+%=====================END of BILINEARIZE of GENERATOR======================
 
 
 %===========================LINEARIZE of LOAD==============================
@@ -1257,8 +1247,8 @@ end
 %===============CONSTRUCTION of DIAGONAL MATRICES==========================
 function sys_mat = fsys_mat(n_gen, n_load,bilin_gen,lin_load)
 
-ns = size(bilin_gen.G1.A,1); % количество переменных состояния в линейной моделе генератора
-lin2mac = 1/9; % коэфф перевода из системы линий в систему машин
+ns = size(bilin_gen.G1.A,1); % number of state variables in the linear generator model
+lin2mac = 1/9; % coeff. of transfer from the system of lines to the system of machines
 
 Ad = zeros(ns * n_gen);
 Bd = zeros(ns * n_gen, 2 * (n_gen+n_load));
@@ -1301,7 +1291,7 @@ end
  sys_mat.Hd = Hd;
  sys_mat.Sd = Sd;
 
- % Матрица входов
+ % Matrix of inputs
  B1 = zeros(ns*4,8);
  B1(1,1) = bilin_gen.G1.for_control_matrix.b11;
  B1(3,2) = bilin_gen.G1.for_control_matrix.b32;
